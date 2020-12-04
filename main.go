@@ -20,7 +20,7 @@ const (
 )
 
 func main() {
-	port := getEnv("PORT", "8080")
+	port := getEnv("PORT", "80")
 
 	// pull secrets & write to file system
 	certFile, err := os.Create("cert.crt")
