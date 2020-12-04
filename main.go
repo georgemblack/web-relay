@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -20,36 +21,79 @@ const (
 )
 
 func main() {
-	// pull secrets & write to file system
-	certFile, err := os.Create("cert.crt")
-	handleErr(err)
-	keyFile, err := os.Create("key.key")
-	handleErr(err)
-	cert, err := getSecret(WebCertSecretName)
-	handleErr(err)
-	key, err := getSecret(WebKeySecretName)
-	handleErr(err)
-	_, err = certFile.Write(cert)
-	handleErr(err)
-	_, err = keyFile.Write(key)
-	handleErr(err)
+	err := initCerts()
+	if err != nil {
+		panic(err)
+	}
 
 	context := context.Background()
 	client, err := storage.NewClient(context)
-	handleErr(err)
+	if err != nil {
+		panic(err)
+	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		key := getObjectKey(r.URL.Path)
-		reader, err := client.Bucket("george.black").Object(key).NewReader(context)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Add("Access-Control-Allow-Origin", "https://george.black")
+		res.Header().Add("Access-Control-Allow-Methods", "GET, OPTIONS")
+
+		if req.Method == "OPTIONS" {
 			return
 		}
-		io.Copy(w, reader)
+		if req.Method != "GET" {
+			http.Error(res, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+
+		key := getObjectKey(req.URL.Path)
+		reader, err := client.Bucket(req.Host).Object(key).NewReader(context)
+		if err != nil {
+			if errors.Is(err, storage.ErrObjectNotExist) {
+				http.Error(res, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				return
+			}
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		defer reader.Close()
+
+		res.Header().Add("Cache-Control", "public, max-age="+getCacheMaxAge(key))
+		_, err = io.Copy(res, reader)
+		if err != nil {
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	log.Println("Listening on 443")
 	log.Fatal(http.ListenAndServeTLS(":443", "cert.crt", "key.key", nil))
+}
+
+func initCerts() error {
+	certFile, err := os.Create("cert.crt")
+	if err != nil {
+		return err
+	}
+	keyFile, err := os.Create("key.key")
+	if err != nil {
+		return err
+	}
+	cert, err := getSecret(WebCertSecretName)
+	if err != nil {
+		return err
+	}
+	key, err := getSecret(WebKeySecretName)
+	if err != nil {
+		return err
+	}
+	_, err = certFile.Write(cert)
+	if err != nil {
+		return err
+	}
+	_, err = keyFile.Write(key)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func getSecret(name string) ([]byte, error) {
@@ -82,15 +126,26 @@ func getObjectKey(path string) string {
 	return path
 }
 
+func getCacheMaxAge(key string) string {
+	split := strings.Split(key, ".")
+	extension := split[len(split)-1]
+	for _, ext := range [...]string{"html", "xml", "json", "txt"} {
+		if extension == ext {
+			return "900"
+		}
+	}
+	for _, ext := range [...]string{"js", "css"} {
+		if extension == ext {
+			return "172800"
+		}
+	}
+
+	return "2592000"
+}
+
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
 	return fallback
-}
-
-func handleErr(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 }
