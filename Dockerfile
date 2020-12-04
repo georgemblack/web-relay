@@ -7,3 +7,5 @@ FROM gcr.io/distroless/base-debian10
 WORKDIR /app
 COPY --from=build-env /go/src/app/main ./main
 CMD ["/app/main"]
+
+EXPOSE 8080
