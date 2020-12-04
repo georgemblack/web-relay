@@ -8,4 +8,4 @@ WORKDIR /app
 COPY --from=build-env /go/src/app/main ./main
 CMD ["/app/main"]
 
-EXPOSE 80
+EXPOSE 443

@@ -20,8 +20,6 @@ const (
 )
 
 func main() {
-	port := getEnv("PORT", "80")
-
 	// pull secrets & write to file system
 	certFile, err := os.Create("cert.crt")
 	handleErr(err)
@@ -50,8 +48,8 @@ func main() {
 		io.Copy(w, reader)
 	})
 
-	log.Println("Listening on " + port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Println("Listening on 443")
+	log.Fatal(http.ListenAndServeTLS(":443", "cert.crt", "key.key", nil))
 }
 
 func getSecret(name string) ([]byte, error) {
