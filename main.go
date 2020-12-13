@@ -20,14 +20,16 @@ const (
 	WebKeySecretName  = "projects/871975485367/secrets/web-origin-key/versions/1"
 )
 
+var ctx context.Context
+
 func main() {
-	err := initCerts()
-	if err != nil {
+	ctx = context.Background()
+
+	if err := initCerts(); err != nil {
 		panic(err)
 	}
 
-	context := context.Background()
-	client, err := storage.NewClient(context)
+	client, err := storage.NewClient(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -45,21 +47,28 @@ func main() {
 		}
 
 		key := getObjectKey(req.URL.Path)
-		reader, err := client.Bucket(req.Host).Object(key).NewReader(context)
+		object := client.Bucket(req.Host).Object(key)
+
+		// get attributes & add as headers
+		attr, err := object.Attrs(ctx)
 		if err != nil {
-			if errors.Is(err, storage.ErrObjectNotExist) {
-				http.Error(res, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-				return
-			}
-			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			handleRequestError(res, err)
+			return
+		}
+		res.Header().Add("Content-Type", attr.ContentType)
+		res.Header().Add("Cache-Control", attr.CacheControl)
+
+		// copy obj body
+		reader, err := object.NewReader(ctx)
+		if err != nil {
+			handleRequestError(res, err)
 			return
 		}
 		defer reader.Close()
 
-		res.Header().Add("Cache-Control", "public, max-age="+getCacheMaxAge(key))
 		_, err = io.Copy(res, reader)
 		if err != nil {
-			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			handleRequestError(res, err)
 			return
 		}
 	})
@@ -97,15 +106,14 @@ func initCerts() error {
 }
 
 func getSecret(name string) ([]byte, error) {
-	context := context.Background()
-	client, err := secretmanager.NewClient(context)
+	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 	request := &secretmanagerpb.AccessSecretVersionRequest{
 		Name: name,
 	}
-	result, err := client.AccessSecretVersion(context, request)
+	result, err := client.AccessSecretVersion(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +149,15 @@ func getCacheMaxAge(key string) string {
 	}
 
 	return "2592000"
+}
+
+func handleRequestError(res http.ResponseWriter, err error) {
+	if errors.Is(err, storage.ErrObjectNotExist) {
+		http.Error(res, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	return
 }
 
 func getEnv(key, fallback string) string {
