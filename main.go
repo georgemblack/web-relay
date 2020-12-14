@@ -49,7 +49,7 @@ func main() {
 		key := getObjectKey(req.URL.Path)
 		object := client.Bucket(req.Host).Object(key)
 
-		// get attributes & add as headers
+		// add headers
 		attr, err := object.Attrs(ctx)
 		if err != nil {
 			handleRequestError(res, err)
@@ -58,7 +58,7 @@ func main() {
 		res.Header().Add("Content-Type", attr.ContentType)
 		res.Header().Add("Cache-Control", attr.CacheControl)
 
-		// copy obj body
+		// copy object body
 		reader, err := object.NewReader(ctx)
 		if err != nil {
 			handleRequestError(res, err)
