@@ -134,23 +134,6 @@ func getObjectKey(path string) string {
 	return path
 }
 
-func getCacheMaxAge(key string) string {
-	split := strings.Split(key, ".")
-	extension := split[len(split)-1]
-	for _, ext := range [...]string{"html", "xml", "json", "txt"} {
-		if extension == ext {
-			return "900"
-		}
-	}
-	for _, ext := range [...]string{"js", "css"} {
-		if extension == ext {
-			return "172800"
-		}
-	}
-
-	return "2592000"
-}
-
 func handleRequestError(res http.ResponseWriter, err error) {
 	if errors.Is(err, storage.ErrObjectNotExist) {
 		http.Error(res, http.StatusText(http.StatusNotFound), http.StatusNotFound)
