@@ -48,23 +48,15 @@ func main() {
 
 		key := getObjectKey(req.URL.Path)
 		object := client.Bucket(req.Host).Object(key)
-
-		// add headers
-		attr, err := object.Attrs(ctx)
-		if err != nil {
-			handleRequestError(res, err)
-			return
-		}
-		res.Header().Add("Content-Type", attr.ContentType)
-		res.Header().Add("Cache-Control", attr.CacheControl)
-
-		// copy object body
 		reader, err := object.NewReader(ctx)
 		if err != nil {
 			handleRequestError(res, err)
 			return
 		}
 		defer reader.Close()
+
+		res.Header().Add("Content-Type", reader.Attrs.ContentType)
+		res.Header().Add("Cache-Control", reader.Attrs.CacheControl)
 
 		_, err = io.Copy(res, reader)
 		if err != nil {
