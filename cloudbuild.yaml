@@ -5,7 +5,6 @@ steps:
     args: ['push', 'us-east1-docker.pkg.dev/$PROJECT_ID/private/web-relay:$COMMIT_SHA']
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
-      - 'gcloud'
       - 'compute'
       - 'instances'
       - 'create-with-container'
