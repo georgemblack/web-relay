@@ -3,17 +3,5 @@ steps:
     args: [ 'build', '-t', 'us-east1-docker.pkg.dev/$PROJECT_ID/private/web-relay:$COMMIT_SHA', '.' ]
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'us-east1-docker.pkg.dev/$PROJECT_ID/private/web-relay:$COMMIT_SHA']
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'compute'
-      - 'instances'
-      - 'create-with-container'
-      - 'web-relay-$BUILD_ID'
-      - '--source-instance-template'
-      - 'web-relay'
-      - '--zone'
-      - 'us-east1-b'
-      - '--container-image'
-      - 'us-east1-docker.pkg.dev/$PROJECT_ID/private/web-relay:$COMMIT_SHA'
 images:
   - 'us-east1-docker.pkg.dev/$PROJECT_ID/private/web-relay:$COMMIT_SHA'
